@@ -1,0 +1,58 @@
+services:
+  api:
+    container_name: konnect-api
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile
+    env_file:
+      - .env
+    ports:
+      - ${PORT}:${PORT}
+    depends_on:
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        - path: ./internal
+          x-initial_sync: true
+          action: rebuild
+        - path: ./cmd
+          x-initial_sync: true
+          action: rebuild
+        - path: ./go.mod
+          action: rebuild
+        - path: ./go.sum
+          action: rebuild
+        - path: ./docker
+          action: rebuild
+        - path: ./docs
+          x-initial_sync: true
+          action: rebuild
+          target: /app/docs
+    networks:
+      - konnect
+  # extended postgres image with postgis
+  db:
+    image: postgis/postgis
+    container_name: konnect-db
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - ${DB_PORT}:5432
+    volumes:
+      - ./.postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U ${DB_USERNAME} -d ${DB_NAME}'"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - konnect
+
+networks:
+  konnect:
+volumes:
+  .postgres-data:

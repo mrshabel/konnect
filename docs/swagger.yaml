@@ -1,0 +1,495 @@
+basePath: /api
+definitions:
+  model.AuthResponse:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/model.User'
+    type: object
+  model.CreateProfileRequest:
+    properties:
+      bio:
+        maxLength: 5000
+        minLength: 10
+        type: string
+      dob:
+        type: string
+      fullname:
+        maxLength: 255
+        minLength: 2
+        type: string
+      gender:
+        allOf:
+        - $ref: '#/definitions/model.Gender'
+        enum:
+        - male
+        - female
+      interests:
+        items:
+          type: string
+        minItems: 1
+        type: array
+      isGenderPublic:
+        type: boolean
+      latitude:
+        type: number
+      longitude:
+        type: number
+      relationshipIntent:
+        allOf:
+        - $ref: '#/definitions/model.RelationshipIntent'
+        enum:
+        - friendship
+        - dating
+        - casual
+        - marriage
+    required:
+    - bio
+    - dob
+    - fullname
+    - gender
+    - interests
+    - latitude
+    - longitude
+    - relationshipIntent
+    type: object
+  model.ErrorResponse:
+    properties:
+      detail: {}
+      message:
+        type: string
+    type: object
+  model.Gender:
+    enum:
+    - male
+    - female
+    type: string
+    x-enum-varnames:
+    - Male
+    - Female
+  model.Profile:
+    properties:
+      bio:
+        type: string
+      createdAt:
+        type: string
+      dob:
+        type: string
+      fullname:
+        type: string
+      gender:
+        $ref: '#/definitions/model.Gender'
+      id:
+        type: string
+      interests:
+        items:
+          type: string
+        type: array
+      isGenderPublic:
+        type: boolean
+      isVerified:
+        type: boolean
+      latitude:
+        type: number
+      longitude:
+        type: number
+      photoPublicId:
+        type: string
+      photoUrl:
+        type: string
+      relationshipIntent:
+        $ref: '#/definitions/model.RelationshipIntent'
+      updatedAt:
+        type: string
+      user:
+        allOf:
+        - $ref: '#/definitions/model.User'
+        description: relations
+      userId:
+        type: string
+    type: object
+  model.RelationshipIntent:
+    enum:
+    - friendship
+    - dating
+    - casual
+    - marriage
+    type: string
+    x-enum-varnames:
+    - Friendship
+    - Dating
+    - Casual
+    - Marriage
+  model.SuccessResponse:
+    properties:
+      data: {}
+      message:
+        type: string
+    type: object
+  model.UpdateProfileRequest:
+    properties:
+      bio:
+        maxLength: 5000
+        minLength: 10
+        type: string
+      dob:
+        type: string
+      fullname:
+        maxLength: 255
+        minLength: 2
+        type: string
+      gender:
+        allOf:
+        - $ref: '#/definitions/model.Gender'
+        enum:
+        - male
+        - female
+      interests:
+        items:
+          type: string
+        minItems: 1
+        type: array
+      isGenderPublic:
+        type: boolean
+      latitude:
+        type: number
+      longitude:
+        type: number
+      relationshipIntent:
+        allOf:
+        - $ref: '#/definitions/model.RelationshipIntent'
+        enum:
+        - friendship
+        - dating
+        - casual
+        - marriage
+    type: object
+  model.User:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      lastActive:
+        type: string
+      profile:
+        allOf:
+        - $ref: '#/definitions/model.Profile'
+        description: relations
+      provider:
+        type: string
+      role:
+        $ref: '#/definitions/model.UserRole'
+      updatedAt:
+        type: string
+      username:
+        type: string
+    type: object
+  model.UserRole:
+    enum:
+    - user
+    - admin
+    type: string
+    x-enum-varnames:
+    - AppUser
+    - Admin
+host: localhost:8000
+info:
+  contact: {}
+  description: Match-making platform for all personalities
+  title: Konnect API
+  version: "1.0"
+paths:
+  /auth/google/callback:
+    get:
+      description: Handles OAuth callback from Google and returns JWT token
+      parameters:
+      - description: Authorization code from Google
+        in: query
+        name: code
+        required: true
+        type: string
+      - description: State parameter for CSRF protection
+        in: query
+        name: state
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Google OAuth callback handler
+      tags:
+      - auth
+  /auth/google/login:
+    get:
+      description: Redirects user to Google OAuth consent screen
+      produces:
+      - application/json
+      responses:
+        "307":
+          description: Redirect to Google OAuth
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Initiate Google OAuth login
+      tags:
+      - auth
+  /profiles:
+    patch:
+      consumes:
+      - application/json
+      description: Update authenticated user's profile
+      parameters:
+      - description: Profile update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Profile updated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Profile'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update user profile
+      tags:
+      - profiles
+    post:
+      consumes:
+      - application/json
+      description: Create a new profile for the authenticated user
+      parameters:
+      - description: Profile data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Profile created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Profile'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create user profile
+      tags:
+      - profiles
+  /profiles/{id}:
+    get:
+      description: Get profile by ID
+      parameters:
+      - description: Profile ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Profile retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Profile'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get user profile
+      tags:
+      - profiles
+  /profiles/nearby:
+    get:
+      description: Get profiles within specified radius of coordinates
+      parameters:
+      - description: Latitude
+        in: query
+        name: lat
+        required: true
+        type: number
+      - description: Longitude
+        in: query
+        name: lng
+        required: true
+        type: number
+      - default: 5000
+        description: Radius in meters
+        in: query
+        name: radius
+        type: number
+      - default: 20
+        description: Limit
+        in: query
+        name: limit
+        type: number
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Nearby profiles retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Profile'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get nearby profiles
+      tags:
+      - profiles
+  /profiles/photo:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload and verify user profile photo
+      parameters:
+      - description: Profile photo
+        in: formData
+        name: photo
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Profile photo uploaded successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Profile'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload profile photo
+      tags:
+      - profiles
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

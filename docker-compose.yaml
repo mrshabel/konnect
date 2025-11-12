@@ -11,14 +11,19 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # volumes:
+    #   - ./internal:/app/internal
+    #   - ./cmd:/app/cmd
     develop:
       watch:
         - path: ./internal
           x-initial_sync: true
           action: rebuild
+          target: /app/internal
         - path: ./cmd
           x-initial_sync: true
           action: rebuild
+          target: /app/cmd
         - path: ./go.mod
           action: rebuild
         - path: ./go.sum
@@ -26,8 +31,8 @@ services:
         - path: ./docker
           action: rebuild
         - path: ./docs
-          x-initial_sync: true
-          action: rebuild
+          # x-initial_sync: true
+          action: sync
           target: /app/docs
     networks:
       - konnect

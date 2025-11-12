@@ -4,11 +4,11 @@ import (
 	"konnect/internal/logger"
 	"konnect/internal/model"
 	"konnect/internal/service"
+	"konnect/internal/util"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 )
 
 type ProfileHandler struct {
@@ -37,8 +37,17 @@ func NewProfileHandler(profileService *service.ProfileService, cloudinaryService
 // @Failure 400,401,500 {object} model.ErrorResponse
 // @Router /profiles [post]
 func (h *ProfileHandler) CreateProfile(c *gin.Context) {
+	// validate model and date
 	var req model.CreateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Message: "Invalid profile data",
+			Detail:  err.Error(),
+		})
+		return
+	}
+	dob, err := util.ValidateDate(req.DOB)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, model.ErrorResponse{
 			Message: "Invalid profile data",
 			Detail:  err.Error(),
@@ -58,7 +67,7 @@ func (h *ProfileHandler) CreateProfile(c *gin.Context) {
 		Fullname:           req.Fullname,
 		Interests:          req.Interests,
 		Bio:                req.Bio,
-		DOB:                req.DOB,
+		DOB:                dob,
 		Gender:             req.Gender,
 		IsGenderPublic:     req.IsGenderPublic,
 		RelationshipIntent: req.RelationshipIntent,
@@ -71,8 +80,6 @@ func (h *ProfileHandler) CreateProfile(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, model.ErrorResponse{Message: "Profile already exists"})
 			return
 		}
-
-		h.logger.Error("failed to create profile", zap.Error(err), zap.String("user_id", user.ID.String()))
 		c.JSON(http.StatusInternalServerError, model.ErrorResponse{Message: "Failed to create profile"})
 		return
 	}
@@ -83,85 +90,29 @@ func (h *ProfileHandler) CreateProfile(c *gin.Context) {
 	})
 }
 
-// GetProfile godoc
-// @Summary Get user profile
-// @Description Get profile by ID
+// GetCurrentUserProfile godoc
+// @Summary Get current user profile
+// @Description Get profile of currently logged in user
 // @Tags profiles
 // @Produce json
 // @Security BearerAuth
-// @Param id path string true "Profile ID"
 // @Success 200 {object} model.SuccessResponse{data=model.Profile} "Profile retrieved successfully"
 // @Failure 400,401,404,500 {object} model.ErrorResponse
-// @Router /profiles/{id} [get]
-func (h *ProfileHandler) GetProfile(c *gin.Context) {
-	var param model.IDParam
-	if err := c.ShouldBindUri(&param); err != nil {
-		c.JSON(http.StatusBadRequest, model.ErrorResponse{Message: "Invalid profile ID"})
-		return
-	}
-
-	profile, err := h.profileService.GetProfile(param.GetID())
-	if err != nil {
-		c.JSON(http.StatusNotFound, model.ErrorResponse{Message: "Profile not found"})
-		return
-	}
-
-	c.JSON(http.StatusOK, model.SuccessResponse{Data: profile})
-}
-
-// UpdateProfile godoc
-// @Summary Update user profile
-// @Description Update authenticated user's profile
-// @Tags profiles
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param request body model.UpdateProfileRequest true "Profile update data"
-// @Success 200 {object} model.SuccessResponse{data=model.Profile} "Profile updated successfully"
-// @Failure 400,401,404,500 {object} model.ErrorResponse
-// @Router /profiles [patch]
-func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
-	var req model.UpdateProfileRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, model.ErrorResponse{
-			Message: "Invalid profile data",
-			Detail:  err.Error(),
-		})
-		return
-	}
-
+// @Router /profiles/me [get]
+func (h *ProfileHandler) GetCurrentUserProfile(c *gin.Context) {
 	user, ok := GetCurrentUser(c)
 	if !ok {
 		c.JSON(http.StatusUnauthorized, model.ErrorResponse{Message: "Unauthorized"})
 		return
 	}
 
-	// payload to be updated
-	updates := &model.Profile{
-		Fullname:           *req.Fullname,
-		Interests:          req.Interests,
-		Bio:                *req.Bio,
-		DOB:                *req.DOB,
-		Gender:             *req.Gender,
-		IsGenderPublic:     *req.IsGenderPublic,
-		RelationshipIntent: *req.RelationshipIntent,
-		Latitude:           *req.Latitude,
-		Longitude:          *req.Longitude,
-	}
-
-	profile, err := h.profileService.UpdateProfile(user.ID, updates)
+	profile, err := h.profileService.GetProfileByUserID(user.ID)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			h.logger.Error("profile to be updated not found", zap.String("user_id", user.ID.String()))
-			c.JSON(http.StatusNotFound, model.ErrorResponse{Message: "Profile not found"})
-			return
-		}
-		h.logger.Error("failed to update profile", zap.Error(err), zap.String("user_id", user.ID.String()))
-		c.JSON(http.StatusInternalServerError, model.ErrorResponse{Message: "Failed to update profile"})
+		c.JSON(http.StatusNotFound, model.ErrorResponse{Message: "Profile not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, model.SuccessResponse{Message: "Profile updated successfully", Data: profile})
+	c.JSON(http.StatusOK, model.SuccessResponse{Message: "Profile retrieved successfully", Data: profile})
 }
 
 // GetNearbyProfiles godoc
@@ -194,7 +145,80 @@ func (h *ProfileHandler) GetNearbyProfiles(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, model.SuccessResponse{Data: profiles})
+	c.JSON(http.StatusOK, model.SuccessResponse{Message: "Nearby profiles retrieved successfully", Data: profiles})
+}
+
+// GetProfile godoc
+// @Summary Get user profile
+// @Description Get profile by ID
+// @Tags profiles
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Profile ID"
+// @Success 200 {object} model.SuccessResponse{data=model.Profile} "Profile retrieved successfully"
+// @Failure 400,401,404,500 {object} model.ErrorResponse
+// @Router /profiles/{id} [get]
+func (h *ProfileHandler) GetProfile(c *gin.Context) {
+	var param model.IDParam
+	if err := c.ShouldBindUri(&param); err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{Message: "Invalid profile ID"})
+		return
+	}
+
+	profile, err := h.profileService.GetProfile(param.GetID())
+	if err != nil {
+		c.JSON(http.StatusNotFound, model.ErrorResponse{Message: "Profile not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.SuccessResponse{Message: "Profile retrieved successfully", Data: profile})
+}
+
+// UpdateProfile godoc
+// @Summary Update user profile
+// @Description Update authenticated user's profile
+// @Tags profiles
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body model.UpdateProfileRequest true "Profile update data"
+// @Success 200 {object} model.SuccessResponse{data=model.Profile} "Profile updated successfully"
+// @Failure 400,401,404,500 {object} model.ErrorResponse
+// @Router /profiles [patch]
+func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
+	var req model.UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Message: "Invalid profile data",
+			Detail:  err.Error(),
+		})
+		return
+	}
+
+	user, ok := GetCurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, model.ErrorResponse{Message: "Unauthorized"})
+		return
+	}
+
+	// payload to be updated
+	data, err := req.Compose()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Message: "Invalid profile data",
+			Detail:  err.Error(),
+		})
+		return
+	}
+
+	profile, err := h.profileService.UpdateProfileByUserID(user.ID, data)
+	if err != nil {
+		h.logger.Error("failed to update profile", zap.Error(err), zap.String("user_id", user.ID.String()))
+		c.JSON(http.StatusInternalServerError, model.ErrorResponse{Message: "Failed to update profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.SuccessResponse{Message: "Profile updated successfully", Data: profile})
 }
 
 // UploadProfilePhoto godoc
@@ -224,7 +248,7 @@ func (h *ProfileHandler) UploadProfilePhoto(c *gin.Context) {
 		return
 	}
 
-	if _, err := h.profileService.GetProfile(user.ID); err != nil {
+	if _, err := h.profileService.GetProfileByUserID(user.ID); err != nil {
 		c.JSON(http.StatusNotFound, model.ErrorResponse{Message: "Profile not found"})
 		return
 	}
@@ -242,7 +266,7 @@ func (h *ProfileHandler) UploadProfilePhoto(c *gin.Context) {
 	}
 
 	// update db with details
-	profile, err := h.profileService.UpdateProfile(user.ID, &model.Profile{PhotoURL: &photoURL, PhotoPublicID: &publicID})
+	profile, err := h.profileService.UpdateProfileByUserID(user.ID, &model.Profile{PhotoURL: &photoURL, PhotoPublicID: &publicID})
 	if err != nil {
 		h.logger.Error("failed to update profile",
 			zap.Error(err),
@@ -259,7 +283,8 @@ func (h *ProfileHandler) UploadProfilePhoto(c *gin.Context) {
 					zap.String("photo_url", photoURL))
 			}
 		}()
-
+		c.JSON(http.StatusInternalServerError, model.ErrorResponse{Message: "Failed to update user profile"})
+		return
 	}
 
 	c.JSON(http.StatusOK, model.SuccessResponse{

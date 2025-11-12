@@ -33,12 +33,12 @@ func (s *CloudinaryService) UploadImage(ctx context.Context, file interface{}, f
 	params := uploader.UploadParams{
 		PublicID:       filename,
 		Folder:         folder,
-		UniqueFilename: api.Bool(false),
-		Overwrite:      api.Bool(false),
+		UniqueFilename: api.Bool(true),
+		Overwrite:      api.Bool(true),
 	}
-	if filename == "" {
-		params.Overwrite = api.Bool(true)
-
+	// if a filename is provided, the file is replaced
+	if filename != "" {
+		params.UniqueFilename = api.Bool(false)
 	}
 
 	resp, err := s.cld.Upload.Upload(ctx, file, params)

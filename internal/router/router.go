@@ -42,10 +42,11 @@ func RegisterRoutes(router *gin.Engine, middleware *handler.Middleware, authHand
 		profiles := protected.Group("/profiles")
 		{
 			profiles.POST("", profileHandler.CreateProfile)
+			profiles.PATCH("", profileHandler.UpdateProfile)
+			profiles.GET("/me", profileHandler.GetCurrentUserProfile)
+			profiles.GET("/nearby", profileHandler.GetNearbyProfiles)
 			profiles.POST("/photo", profileHandler.UploadProfilePhoto)
 			profiles.GET("/:id", profileHandler.GetProfile)
-			profiles.PATCH("", profileHandler.UpdateProfile)
-			profiles.GET("/nearby", profileHandler.GetNearbyProfiles)
 		}
 	}
 }

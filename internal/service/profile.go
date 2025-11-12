@@ -2,19 +2,20 @@ package service
 
 import (
 	"errors"
-	"fmt"
 	"konnect/internal/database"
 	"konnect/internal/logger"
 	"konnect/internal/model"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 var (
-	ErrProfileNotFound = errors.New("profile not found")
-	ErrProfileExists   = errors.New("profile already exists")
+	ErrProfileNotFound     = errors.New("profile not found")
+	ErrProfileExists       = errors.New("profile already exists")
+	ErrProfileUserNotFound = errors.New("user not found")
 )
 
 type ProfileService struct {
@@ -31,18 +32,38 @@ func NewProfileService(db *database.DB, logger *logger.Logger) *ProfileService {
 
 // CreateProfile creates a new profile for a user
 func (s *ProfileService) CreateProfile(profile *model.Profile) error {
-	// check for profile existence
-	existingProfile, _ := s.GetProfileByUserID(profile.UserID)
-	if existingProfile != nil {
-		s.logError(ErrProfileExists, "profile already exists", zap.String("user_id", profile.UserID.String()))
-		return ErrProfileExists
-	}
+	query := `
+		INSERT INTO profiles(user_id, fullname, interests, bio, photo_url, photo_public_id, is_verified, dob, gender, is_gender_public, relationship_intent, latitude, longitude, location)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, ST_Point($14, $15))
+		RETURNING id, user_id, fullname, interests, bio, photo_url, photo_public_id, is_verified, dob, gender, is_gender_public, relationship_intent, latitude, longitude,
+		created_at, updated_at
+	`
 
-	// set db point from coordinates
-	profile.Location = fmt.Sprintf("ST_Point(%f, %f)", profile.Longitude, profile.Latitude)
-
-	if err := s.db.Create(profile).Error; err != nil {
+	if err := s.db.Raw(query,
+		profile.UserID,
+		profile.Fullname,
+		profile.Interests,
+		profile.Bio,
+		profile.PhotoURL,
+		profile.PhotoPublicID,
+		profile.IsVerified,
+		profile.DOB,
+		profile.Gender,
+		profile.IsGenderPublic,
+		profile.RelationshipIntent,
+		profile.Latitude,
+		profile.Longitude,
+		profile.Longitude,
+		profile.Latitude,
+	).Scan(profile).Error; err != nil {
 		s.logError(err, "failed to create profile", zap.String("user_id", profile.UserID.String()))
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return ErrProfileExists
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrProfileUserNotFound
+		}
+
 		return err
 	}
 	return nil
@@ -67,19 +88,21 @@ func (s *ProfileService) GetProfileByUserID(userID uuid.UUID) (*model.Profile, e
 }
 
 // UpdateProfile updates an existing profile
-func (s *ProfileService) UpdateProfile(id uuid.UUID, updates *model.Profile) (*model.Profile, error) {
-	// set db point if coordinates are updated
-	if updates.Latitude != 0 && updates.Longitude != 0 {
-		updates.Location = fmt.Sprintf("ST_POINT(%f, %f)", updates.Longitude, updates.Latitude)
-	}
-
+func (s *ProfileService) UpdateProfileByUserID(userID uuid.UUID, updates *model.Profile) (*model.Profile, error) {
 	var profile model.Profile
 	if err := s.db.Model(&model.Profile{}).
-		Where("id = ?", id).
+		Where("user_id = ?", userID).
 		Clauses(clause.Returning{}).
 		Updates(updates).
 		Scan(&profile).Error; err != nil {
-		s.logError(err, "failed to update profile", zap.String("profile_id", id.String()))
+		s.logError(err, "failed to update profile", zap.String("user_id", userID.String()))
+
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, ErrProfileExists
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrProfileUserNotFound
+		}
 		return nil, err
 	}
 	return &profile, nil

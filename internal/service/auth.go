@@ -53,7 +53,7 @@ func (s *AuthService) UpsertUserFromProvider(gothUser goth.User) (*model.User, e
 
 	// upsert user by email
 	if err := s.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
+		Columns:   []clause.Column{{Name: "email"}},
 		DoUpdates: clause.AssignmentColumns([]string{"last_active"}),
 	}).Create(&user).Error; err != nil {
 		s.logError(err, "failed to upsert user", zap.String("email", gothUser.Email), zap.String("provider", gothUser.Provider))

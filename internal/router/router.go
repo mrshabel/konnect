@@ -10,7 +10,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func RegisterRoutes(router *gin.Engine, middleware *handler.Middleware, authHandler *handler.AuthHandler, profileHandler *handler.ProfileHandler) {
+func RegisterRoutes(router *gin.Engine, middleware *handler.Middleware, authHandler *handler.AuthHandler, profileHandler *handler.ProfileHandler, swipeHandler *handler.SwipeHandler) {
 	// cors
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"},
@@ -47,6 +47,13 @@ func RegisterRoutes(router *gin.Engine, middleware *handler.Middleware, authHand
 			profiles.GET("/nearby", profileHandler.GetNearbyProfiles)
 			profiles.POST("/photo", profileHandler.UploadProfilePhoto)
 			profiles.GET("/:id", profileHandler.GetProfile)
+		}
+
+		// swipes
+		swipes := protected.Group("/swipes")
+		{
+			swipes.POST("", swipeHandler.CreateSwipe)
+			swipes.GET("/me", swipeHandler.GetUserSwipeHistory)
 		}
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"konnect/internal/logger"
 	"konnect/internal/router"
 	"konnect/internal/service"
+	"konnect/internal/worker"
 	"log"
 	"net/http"
 	"os/signal"
@@ -25,7 +26,6 @@ import (
 // @version         1.0
 // @description     Match-making platform for all personalities
 
-// @host      localhost:8000
 // @BasePath  /api
 
 // @securityDefinitions.apikey BearerAuth
@@ -55,6 +55,10 @@ func main() {
 		logger.Fatal("failed to connect to database", zap.String("component", "main"), zap.Error(err))
 	}
 
+	// worker client
+	workerClient := worker.NewWorkerClient(cfg.RedisAddr)
+	defer workerClient.Close()
+
 	// setup goth
 	goth.UseProviders(
 		google.New(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleCallbackURL, "email", "profile"),
@@ -68,10 +72,12 @@ func main() {
 	// services
 	authService := service.NewAuthService(db, cfg, logger)
 	profileService := service.NewProfileService(db, logger)
+	swipeService := service.NewSwipeService(db, workerClient.Client, logger)
 
 	// handlers
 	authHandler := handler.NewAuthHandler(authService)
 	profileHandler := handler.NewProfileHandler(profileService, cloudinaryService, logger)
+	swipeHandler := handler.NewSwipeHandler(swipeService, logger)
 
 	// middleware
 	middleware := handler.NewMiddleware(authService, logger)
@@ -81,7 +87,7 @@ func main() {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 
-	router.RegisterRoutes(r, middleware, authHandler, profileHandler)
+	router.RegisterRoutes(r, middleware, authHandler, profileHandler, swipeHandler)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%v", cfg.Port),

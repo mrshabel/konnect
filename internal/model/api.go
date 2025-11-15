@@ -18,21 +18,8 @@ type ErrorResponse struct {
 }
 
 type PaginationQuery struct {
-	Page     int `form:"page" binding:"omitempty,gte=1"`
-	PageSize int `form:"pageSize" binding:"omitempty,gte=1,lte=100"`
-}
-
-func (p *PaginationQuery) GetOffsetAndLimit() (int, int) {
-	if p.Page == 0 {
-		p.Page = defaultPage
-	}
-	if p.PageSize == 0 {
-		p.PageSize = defaultPageSize
-	}
-
-	offset := (p.Page - 1) * p.PageSize
-	// offset and limit
-	return offset, p.PageSize
+	Limit  int `form:"limit,default=100" binding:"min=1,max=100"`
+	Offset int `form:"offset,default=0" binding:"min=0"`
 }
 
 // params with only ID

@@ -18,4 +18,4 @@ start-db:
 	docker compose up -d
 
 gen-docs:
-	swag init -g ./cmd/main.go -o ./docs
+	swag init -g ./cmd/api/main.go -o ./docs

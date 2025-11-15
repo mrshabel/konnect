@@ -139,7 +139,13 @@ func (h *ProfileHandler) GetNearbyProfiles(c *gin.Context) {
 		return
 	}
 
-	profiles, err := h.profileService.GetNearbyProfiles(query.Lat, query.Lng, query.Radius, query.Offset, query.Limit)
+	user, ok := GetCurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, model.ErrorResponse{Message: "Unauthorized"})
+		return
+	}
+
+	profiles, err := h.profileService.GetNearbyProfiles(user.ID, query.Lat, query.Lng, query.Radius, query.Offset, query.Limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.ErrorResponse{Message: "Failed to get nearby profiles"})
 		return

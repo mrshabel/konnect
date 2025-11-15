@@ -31,11 +31,25 @@ services:
         - path: ./docker
           action: rebuild
         - path: ./docs
-          # x-initial_sync: true
+          x-initial_sync: true
           action: sync
           target: /app/docs
     networks:
       - konnect
+
+  worker:
+    container_name: konnect-worker
+    build:
+      context: .
+      dockerfile: ./docker/worker.Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - konnect
+
   # extended postgres image with postgis
   db:
     image: postgis/postgis
@@ -52,12 +66,26 @@ services:
       test: ["CMD-SHELL", "sh -c 'pg_isready -U ${DB_USERNAME} -d ${DB_NAME}'"]
       interval: 5s
       timeout: 5s
-      retries: 3
-      start_period: 15s
+      retries: 10
+      start_period: 30s
     networks:
       - konnect
+
+  redis:
+    image: redis:8
+    container_name: konnect-redis
+    ports:
+      - ${REDIS_PORT}:6379
+    volumes:
+      - ./.redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 networks:
   konnect:
 volumes:
   .postgres-data:
+  .redis-data:

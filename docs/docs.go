@@ -538,6 +538,149 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/swipes": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new swipe (like or pass) on another user. Returns a match if one is created.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "swipes"
+                ],
+                "summary": "Create a swipe",
+                "parameters": [
+                    {
+                        "description": "Swipe data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.CreateSwipeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Swipe created successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.SwipeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/swipes/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get all paginated swipes performed by a given user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "swipes"
+                ],
+                "summary": "Get swipe history",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "default": 20,
+                        "description": "Limit",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "default": 0,
+                        "description": "Offset",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Swipe history retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/model.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.Swipe"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -620,6 +763,29 @@ const docTemplate = `{
                 }
             }
         },
+        "model.CreateSwipeRequest": {
+            "type": "object",
+            "required": [
+                "swipeType",
+                "swipeeId"
+            ],
+            "properties": {
+                "swipeType": {
+                    "enum": [
+                        "like",
+                        "pass"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.SwipeType"
+                        }
+                    ]
+                },
+                "swipeeId": {
+                    "type": "string"
+                }
+            }
+        },
         "model.ErrorResponse": {
             "type": "object",
             "properties": {
@@ -639,6 +805,81 @@ const docTemplate = `{
                 "Male",
                 "Female"
             ]
+        },
+        "model.Match": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "description": "id is be a sorted concatenation of user1_id and user2_id",
+                    "type": "string"
+                },
+                "isActive": {
+                    "type": "boolean"
+                },
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Message"
+                    }
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "user1": {
+                    "description": "relations",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.User"
+                        }
+                    ]
+                },
+                "user1Id": {
+                    "type": "string"
+                },
+                "user2": {
+                    "$ref": "#/definitions/model.User"
+                },
+                "user2Id": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Message": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "match": {
+                    "description": "relations",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.Match"
+                        }
+                    ]
+                },
+                "matchId": {
+                    "type": "string"
+                },
+                "sender": {
+                    "$ref": "#/definitions/model.User"
+                },
+                "senderId": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
         },
         "model.Profile": {
             "type": "object",
@@ -727,6 +968,62 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "model.Swipe": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "swipeType": {
+                    "$ref": "#/definitions/model.SwipeType"
+                },
+                "swipee": {
+                    "$ref": "#/definitions/model.User"
+                },
+                "swipeeId": {
+                    "type": "string"
+                },
+                "swiper": {
+                    "description": "relations",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.User"
+                        }
+                    ]
+                },
+                "swiperId": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.SwipeResponse": {
+            "type": "object",
+            "properties": {
+                "match": {
+                    "$ref": "#/definitions/model.Match"
+                },
+                "swipe": {
+                    "$ref": "#/definitions/model.Swipe"
+                }
+            }
+        },
+        "model.SwipeType": {
+            "type": "string",
+            "enum": [
+                "like",
+                "pass"
+            ],
+            "x-enum-varnames": [
+                "Like",
+                "Pass"
+            ]
         },
         "model.UpdateProfileRequest": {
             "type": "object",
@@ -848,7 +1145,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:8000",
+	Host:             "",
 	BasePath:         "/api",
 	Schemes:          []string{},
 	Title:            "Konnect API",

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -23,6 +24,9 @@ type Config struct {
 	GoogleClientSecret string
 	GoogleCallbackURL  string
 	CloudinaryURL      string
+	RedisAddr          string
+	RedisURL           string
+	CourierAPIKey      string
 }
 
 // New returns a config object from the env and a non-nil error if the env value is not present
@@ -36,6 +40,9 @@ func New() (*Config, error) {
 	dbPort := getEnv("DB_PORT", "")
 	dbHost := getEnv("DB_HOST", "")
 
+	redisHost := getEnv("REDIS_HOST", "")
+	redisPort := getEnvInt("REDIS_PORT", 6379)
+
 	// server configs
 	port := getEnvInt("PORT", 8000)
 	jwtSecret := getEnv("JWT_SECRET", "")
@@ -48,6 +55,9 @@ func New() (*Config, error) {
 	googleCallbackURL := getEnv("GOOGLE_CALLBACK_URL", "")
 
 	cloudinaryURL := getEnv("CLOUDINARY_URL", "")
+
+	// notifs
+	courierAPIKey := getEnv("COURIER_API_KEY", "")
 
 	return &Config{
 		DbName:             dbName,
@@ -63,6 +73,9 @@ func New() (*Config, error) {
 		GoogleClientSecret: googleClientSecret,
 		GoogleCallbackURL:  googleCallbackURL,
 		CloudinaryURL:      cloudinaryURL,
+		RedisAddr:          fmt.Sprintf("%s:%d", redisHost, redisPort),
+		RedisURL:           fmt.Sprintf("redis://%s:%d", redisHost, redisPort),
+		CourierAPIKey:      courierAPIKey,
 	}, nil
 }
 

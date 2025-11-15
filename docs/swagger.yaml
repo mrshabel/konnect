@@ -54,6 +54,20 @@ definitions:
     - longitude
     - relationshipIntent
     type: object
+  model.CreateSwipeRequest:
+    properties:
+      swipeType:
+        allOf:
+        - $ref: '#/definitions/model.SwipeType'
+        enum:
+        - like
+        - pass
+      swipeeId:
+        type: string
+    required:
+    - swipeType
+    - swipeeId
+    type: object
   model.ErrorResponse:
     properties:
       detail: {}
@@ -68,6 +82,53 @@ definitions:
     x-enum-varnames:
     - Male
     - Female
+  model.Match:
+    properties:
+      createdAt:
+        type: string
+      id:
+        description: id is be a sorted concatenation of user1_id and user2_id
+        type: string
+      isActive:
+        type: boolean
+      messages:
+        items:
+          $ref: '#/definitions/model.Message'
+        type: array
+      updatedAt:
+        type: string
+      user1:
+        allOf:
+        - $ref: '#/definitions/model.User'
+        description: relations
+      user1Id:
+        type: string
+      user2:
+        $ref: '#/definitions/model.User'
+      user2Id:
+        type: string
+    type: object
+  model.Message:
+    properties:
+      content:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: string
+      match:
+        allOf:
+        - $ref: '#/definitions/model.Match'
+        description: relations
+      matchId:
+        type: string
+      sender:
+        $ref: '#/definitions/model.User'
+      senderId:
+        type: string
+      updatedAt:
+        type: string
+    type: object
   model.Profile:
     properties:
       bio:
@@ -127,6 +188,42 @@ definitions:
       message:
         type: string
     type: object
+  model.Swipe:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: string
+      swipeType:
+        $ref: '#/definitions/model.SwipeType'
+      swipee:
+        $ref: '#/definitions/model.User'
+      swipeeId:
+        type: string
+      swiper:
+        allOf:
+        - $ref: '#/definitions/model.User'
+        description: relations
+      swiperId:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  model.SwipeResponse:
+    properties:
+      match:
+        $ref: '#/definitions/model.Match'
+      swipe:
+        $ref: '#/definitions/model.Swipe'
+    type: object
+  model.SwipeType:
+    enum:
+    - like
+    - pass
+    type: string
+    x-enum-varnames:
+    - Like
+    - Pass
   model.UpdateProfileRequest:
     properties:
       bio:
@@ -196,7 +293,6 @@ definitions:
     x-enum-varnames:
     - AppUser
     - Admin
-host: localhost:8000
 info:
   contact: {}
   description: Match-making platform for all personalities
@@ -522,6 +618,93 @@ paths:
       summary: Upload profile photo
       tags:
       - profiles
+  /swipes:
+    post:
+      consumes:
+      - application/json
+      description: Create a new swipe (like or pass) on another user. Returns a match
+        if one is created.
+      parameters:
+      - description: Swipe data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateSwipeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Swipe created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.SwipeResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a swipe
+      tags:
+      - swipes
+  /swipes/me:
+    get:
+      description: Get all paginated swipes performed by a given user
+      parameters:
+      - default: 20
+        description: Limit
+        in: query
+        name: limit
+        type: number
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Swipe history retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/model.SuccessResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Swipe'
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get swipe history
+      tags:
+      - swipes
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.

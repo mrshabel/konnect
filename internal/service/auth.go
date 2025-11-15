@@ -78,7 +78,7 @@ func (s *AuthService) GetUserByUsername(username string) (*model.User, error) {
 // GetUserByID retrieves user by ID
 func (s *AuthService) GetUserByID(id uuid.UUID) (*model.User, error) {
 	var user model.User
-	if err := s.db.First(&user, "id = ?", id).Preload("Profile").Error; err != nil {
+	if err := s.db.Where("id = ?", id).Joins("Profile").Take(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
 		}

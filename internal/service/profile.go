@@ -72,7 +72,7 @@ func (s *ProfileService) CreateProfile(profile *model.Profile) error {
 // GetProfile retrieves a profile by ID
 func (s *ProfileService) GetProfile(id uuid.UUID) (*model.Profile, error) {
 	var profile model.Profile
-	if err := s.db.First(&profile, "id = ?", id).Error; err != nil {
+	if err := s.db.Where("id = ?", id).Take(&profile); err != nil {
 		return nil, ErrProfileNotFound
 	}
 	return &profile, nil
@@ -81,7 +81,7 @@ func (s *ProfileService) GetProfile(id uuid.UUID) (*model.Profile, error) {
 // GetProfileByUserID retrieves a profile by user ID
 func (s *ProfileService) GetProfileByUserID(userID uuid.UUID) (*model.Profile, error) {
 	var profile model.Profile
-	if err := s.db.First(&profile, "user_id = ?", userID).Error; err != nil {
+	if err := s.db.Where("user_id = ?", userID).Take(&profile).Error; err != nil {
 		return nil, ErrProfileNotFound
 	}
 	return &profile, nil
@@ -109,11 +109,12 @@ func (s *ProfileService) UpdateProfileByUserID(userID uuid.UUID, updates *model.
 }
 
 // GetNearbyProfiles gets profiles within a radius (in meters) of given coordinates
-func (s *ProfileService) GetNearbyProfiles(lat, lng float64, radiusMeters float64, offset int, limit int) ([]model.Profile, error) {
+func (s *ProfileService) GetNearbyProfiles(userID uuid.UUID, lat, lng float64, radiusMeters float64, offset int, limit int) ([]model.Profile, error) {
 	var profiles []model.Profile
 
 	// nearby distance relative to the location. (lon, lat)
-	query := s.db.Where("ST_DWithin(location, ST_Point(?, ?)::GEOGRAPHY, ?)", lng, lat, radiusMeters)
+	query := s.db.Where("user_id != ?", userID).
+		Where("ST_DWithin(location, ST_Point(?, ?)::GEOGRAPHY, ?)", lng, lat, radiusMeters)
 	if err := query.Limit(limit).Offset(offset).Find(&profiles).Error; err != nil {
 		s.logError(err, "failed to get nearby profiles")
 		return nil, err

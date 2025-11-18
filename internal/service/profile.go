@@ -1,7 +1,9 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"konnect/internal/cache"
 	"konnect/internal/database"
 	"konnect/internal/logger"
 	"konnect/internal/model"
@@ -19,14 +21,16 @@ var (
 )
 
 type ProfileService struct {
-	db     *database.DB
-	logger *zap.Logger
+	db            *database.DB
+	interestCache *cache.InterestCache
+	logger        *zap.Logger
 }
 
-func NewProfileService(db *database.DB, logger *logger.Logger) *ProfileService {
+func NewProfileService(db *database.DB, interestCache *cache.InterestCache, logger *logger.Logger) *ProfileService {
 	return &ProfileService{
-		db:     db,
-		logger: logger.With(zap.String("component", "profile_service")),
+		db:            db,
+		interestCache: interestCache,
+		logger:        logger.With(zap.String("component", "profile_service")),
 	}
 }
 
@@ -66,6 +70,13 @@ func (s *ProfileService) CreateProfile(profile *model.Profile) error {
 
 		return err
 	}
+
+	// add interests to cache in background
+	go func() {
+		if err := s.interestCache.AddUserInterests(context.Background(), profile.UserID.String(), profile.Interests); err != nil {
+			s.logger.Warn("failed to add user interests to cache on profile creation", zap.Error(err), zap.String("user_id", profile.UserID.String()))
+		}
+	}()
 	return nil
 }
 
@@ -89,8 +100,14 @@ func (s *ProfileService) GetProfileByUserID(userID uuid.UUID) (*model.Profile, e
 
 // UpdateProfile updates an existing profile
 func (s *ProfileService) UpdateProfileByUserID(userID uuid.UUID, updates *model.Profile) (*model.Profile, error) {
+	// retrieve current profile state
+	currentProfile, err := s.GetProfileByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+
 	var profile model.Profile
-	if err := s.db.Model(&model.Profile{}).
+	if err := s.db.Model(&profile).
 		Where("user_id = ?", userID).
 		Clauses(clause.Returning{}).
 		Updates(updates).
@@ -105,6 +122,20 @@ func (s *ProfileService) UpdateProfileByUserID(userID uuid.UUID, updates *model.
 		}
 		return nil, err
 	}
+
+	// sync with cache if interests were provided
+	if updates.Interests != nil {
+		go func() {
+			err := s.interestCache.UpdateUserInterests(context.Background(), userID.String(), currentProfile.Interests, updates.Interests)
+			if err != nil {
+				s.logger.Warn("failed to update user interests in cache on profile update",
+					zap.Error(err),
+					zap.String("user_id", userID.String()),
+				)
+			}
+		}()
+	}
+
 	return &profile, nil
 }
 

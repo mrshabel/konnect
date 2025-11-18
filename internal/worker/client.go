@@ -1,6 +1,10 @@
 package worker
 
-import "github.com/hibiken/asynq"
+import (
+	"konnect/internal/config"
+
+	"github.com/hibiken/asynq"
+)
 
 type WorkerClient struct {
 	*asynq.Client
@@ -8,8 +12,8 @@ type WorkerClient struct {
 
 // NewWorkerClient creates a new instance of the background worker client by initiating a connection to the broker.
 // The caller must close the client on shutdown
-func NewWorkerClient(redisAddr string) *WorkerClient {
-	client := asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr})
+func NewWorkerClient(cfg *config.Config) *WorkerClient {
+	client := asynq.NewClient(asynq.RedisClientOpt{Addr: cfg.RedisAddr, Password: cfg.RedisPassword})
 	// defer client.Close()
 	return &WorkerClient{client}
 }

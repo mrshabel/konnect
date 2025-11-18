@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"konnect/internal/cache"
 	"konnect/internal/config"
 	"konnect/internal/database"
 	"konnect/internal/handler"
@@ -56,8 +57,15 @@ func main() {
 	}
 
 	// worker client
-	workerClient := worker.NewWorkerClient(cfg.RedisAddr)
+	workerClient := worker.NewWorkerClient(cfg)
 	defer workerClient.Close()
+
+	// cache
+	cacheClient, err := cache.New(cfg)
+	if err != nil {
+		logger.Fatal("failed to connect to redis cache", zap.Error(err))
+	}
+	defer cacheClient.Close()
 
 	// setup goth
 	goth.UseProviders(
@@ -69,9 +77,13 @@ func main() {
 		logger.Fatal("failed to initialize cloudinary service", zap.String("component", "main"), zap.Error(err))
 	}
 
+	// cache services
+	interestCache := cache.NewInterests(cacheClient, logger)
+
 	// services
 	authService := service.NewAuthService(db, cfg, logger)
-	profileService := service.NewProfileService(db, logger)
+	// profile service now depends on the interest cache
+	profileService := service.NewProfileService(db, interestCache, logger)
 	swipeService := service.NewSwipeService(db, workerClient.Client, logger)
 
 	// handlers
@@ -82,10 +94,13 @@ func main() {
 	// middleware
 	middleware := handler.NewMiddleware(authService, logger)
 
+	// enqueue seeder jobs
+	if err := worker.NewCacheSeedingJob(workerClient.Client); err != nil {
+		logger.Fatal("failed to enqueue cache seeding job", zap.Error(err))
+	}
+
 	// server router
 	r := gin.Default()
-	r.Use(gin.Logger())
-	r.Use(gin.Recovery())
 
 	router.RegisterRoutes(r, middleware, authHandler, profileHandler, swipeHandler)
 
@@ -97,8 +112,8 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 	}
 
-	shutdownDone := make(chan struct{}, 1)
-	go gracefulShutdown(server, logger, shutdownDone)
+	done := make(chan struct{}, 1)
+	go gracefulShutdown(server, logger, done)
 
 	logger.Info("Server starting", zap.String("addr", server.Addr))
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -106,7 +121,7 @@ func main() {
 	}
 
 	// wait for the graceful shutdown to complete
-	<-shutdownDone
+	<-done
 	logger.Info("Graceful shutdown complete")
 }
 

@@ -25,6 +25,7 @@ type Config struct {
 	GoogleCallbackURL  string
 	CloudinaryURL      string
 	RedisAddr          string
+	RedisPassword      string
 	RedisURL           string
 	CourierAPIKey      string
 }
@@ -41,6 +42,7 @@ func New() (*Config, error) {
 	dbHost := getEnv("DB_HOST", "")
 
 	redisHost := getEnv("REDIS_HOST", "")
+	redisPassword := getEnv("REDIS_PASSWORD", "")
 	redisPort := getEnvInt("REDIS_PORT", 6379)
 
 	// server configs
@@ -74,7 +76,8 @@ func New() (*Config, error) {
 		GoogleCallbackURL:  googleCallbackURL,
 		CloudinaryURL:      cloudinaryURL,
 		RedisAddr:          fmt.Sprintf("%s:%d", redisHost, redisPort),
-		RedisURL:           fmt.Sprintf("redis://%s:%d", redisHost, redisPort),
+		RedisPassword:      redisPassword,
+		RedisURL:           fmt.Sprintf("redis://:%s@%s:%d", redisPassword, redisHost, redisPort),
 		CourierAPIKey:      courierAPIKey,
 	}, nil
 }
@@ -100,7 +103,7 @@ func getEnvInt(key string, fallback int) int {
 	}
 	intVal, err := strconv.ParseInt(val, 10, 64)
 	if err != nil {
-		return fallback
+		panic(fmt.Sprintf("env variable %s has invalid integer value: %s", key, val))
 	}
 	return int(intVal)
 }
@@ -115,7 +118,7 @@ func getEnvFloat(key string, fallback float64) float64 {
 	}
 	floatVal, err := strconv.ParseFloat(val, 64)
 	if err != nil {
-		return fallback
+		panic(fmt.Sprintf("env variable %s has invalid float value: %s", key, val))
 	}
 	return floatVal
 }

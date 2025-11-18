@@ -46,6 +46,14 @@ func (h *ProfileHandler) CreateProfile(c *gin.Context) {
 		})
 		return
 	}
+
+	if !model.ValidateInterests(req.Interests) {
+		c.JSON(http.StatusBadRequest, model.ErrorResponse{
+			Message: "Unknown interest provided in profile data",
+		})
+		return
+	}
+
 	dob, err := util.ValidateDate(req.DOB)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, model.ErrorResponse{
@@ -215,6 +223,16 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 			Detail:  err.Error(),
 		})
 		return
+	}
+
+	// get validate interests if provided
+	if req.Interests != nil {
+		if len(req.Interests) != 0 && !model.ValidateInterests(req.Interests) {
+			c.JSON(http.StatusBadRequest, model.ErrorResponse{
+				Message: "Unknown interest provided in profile data",
+			})
+			return
+		}
 	}
 
 	profile, err := h.profileService.UpdateProfileByUserID(user.ID, data)
